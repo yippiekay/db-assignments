@@ -48,7 +48,7 @@ async function task_1_2(db) {
             OrderID AS "Order Id",
             SUM(UnitPrice * Quantity) AS "Order Total Price",
             ROUND(SUM(Discount * Quantity) * 100 / SUM(UnitPrice * Quantity),3) AS "Total Order Discount, %"
-        FROM Orderdetails
+        FROM OrderDetails
         GROUP BY OrderID
         ORDER BY OrderID DESC;
     `);
@@ -177,6 +177,7 @@ async function task_1_8(db) {
         FROM Products AS p
         JOIN Categories AS c ON p.CategoryID = c.CategoryID
         GROUP BY p.CategoryID
+        ORDER BY c.CategoryName
     `);
     return result[0];
 }
@@ -401,7 +402,7 @@ async function task_1_19(db) {
             SUM(od.UnitPrice * od.Quantity) AS 'TotalOrdersAmount, $'
         FROM Customers AS c
         JOIN Orders AS o ON c.CustomerID = o.CustomerID
-        JOIN Orderdetails AS od ON o.OrderID = od.OrderID
+        JOIN OrderDetails AS od ON o.OrderID = od.OrderID
         GROUP BY o.CustomerID
         HAVING SUM(od.UnitPrice * od.Quantity) > 10000
         ORDER BY \`TotalOrdersAmount, $\` DESC, CustomerID
@@ -425,7 +426,7 @@ async function task_1_20(db) {
             SUM(od.UnitPrice * od.Quantity) AS "Amount, $"
         FROM Employees AS e
         JOIN Orders AS o ON e.EmployeeID = o.EmployeeID
-        JOIN Orderdetails AS od ON o.OrderID = od.OrderID
+        JOIN OrderDetails AS od ON o.OrderID = od.OrderID
         GROUP BY o.EmployeeID
         ORDER BY \`Amount, $\` DESC
         LIMIT 1
@@ -444,7 +445,7 @@ async function task_1_21(db) {
         SELECT 
             OrderID,
             SUM(UnitPrice * Quantity) AS "Maximum Purchase Amount, $"
-        FROM Orderdetails
+        FROM OrderDetails
         GROUP BY OrderID
         ORDER BY \`Maximum Purchase Amount, $\` DESC
         LIMIT 1
@@ -465,14 +466,14 @@ async function task_1_22(db) {
             c.CompanyName,
             p.ProductName,
             od.UnitPrice AS "PricePerItem"
-        FROM Orderdetails AS od
+        FROM OrderDetails AS od
         JOIN Orders AS o ON od.OrderID = o.OrderID
         JOIN Customers AS c ON o.CustomerID = c.CustomerID
         JOIN Products AS p ON od.ProductID = p.ProductID
         WHERE od.UnitPrice = 
             (SELECT 
                 MAX(od1.UnitPrice) 
-            FROM Orderdetails AS od1 
+            FROM OrderDetails AS od1 
             JOIN Orders AS o1 ON od1.OrderID = o1.OrderID
             JOIN Customers AS c1 ON o1.CustomerID = c1.CustomerID
             WHERE c.CustomerID = c1.CustomerID)
