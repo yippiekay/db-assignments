@@ -22,6 +22,12 @@
  * */
 async function before(db) {
     await db.collection('employees').ensureIndex({CustomerID: 1});
+    await db.collection('customers').createIndex({CustomerID: 1});
+    await db.collection('products').createIndex({ProductID: 1});
+    await db.collection('orders').createIndex({OrderID: 1});
+    await db.collection('orders').createIndex({CustomerID: 1});
+    await db.collection('order-details').createIndex({OrderID: 1});
+    await db.collection('order-details').createIndex({ProductID: 1});
 }
 
 /**
@@ -307,20 +313,6 @@ async function task_1_6(db) {
 async function task_1_7(db) {
     const result = await db.collection("employees").aggregate([
         {
-            $project: {
-                _id: 0,
-                EmployeeID: 1,
-                "FullName": { $concat: ["$TitleOfCourtesy", "$FirstName", " ", "$LastName"] },
-                ReportsTo: {
-                    $cond: { 
-                        if: { $isNumber: "$ReportsTo" },
-                        then: "$ReportsTo",
-                        else: null
-                    }
-                }
-            }
-        },
-        {
             $lookup: {
                 from: "employees",
                 localField: "ReportsTo",
@@ -338,14 +330,10 @@ async function task_1_7(db) {
             $project: {
                 _id: 0,
                 EmployeeID: 1,
-                FullName: 1,
-                ReportsTo: {
-                    $cond: { 
-                        if: { $ne: ["$ReportsTo", null] },
-                        then: { $concat: ["$ReportsToObj.FirstName", " ", "$ReportsToObj.LastName"] },
-                        else: "-"
-                    }
-                }               
+                FullName: { $concat: ["$TitleOfCourtesy", "$FirstName", " ", "$LastName"]},
+                ReportsTo: { 
+                    $ifNull: [ {$concat: ["$ReportsToObj.FirstName", " ", "$ReportsToObj.LastName"] }, "-"] 
+                }             
             }
         },
         {
@@ -1029,6 +1017,13 @@ async function task_1_21(db) {
  */
 async function task_1_22(db) {
     const result = await db.collection("orders").aggregate([
+        {
+            $project: {
+                _id: 0,
+                OrderID: 1,
+                CustomerID: 1
+            }
+        },
         {
             $lookup: {
                 from: "order-details",
