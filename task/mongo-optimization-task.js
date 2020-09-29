@@ -15,7 +15,8 @@ const ObjectId = require('mongodb').ObjectID;
  * Test timeout is increased to 60sec for the function.
  * */
 async function before(db) {
-    await db.collection('opportunities').createIndex({'initiativeId': 1});
+    await db.collection('opportunities').createIndex({'initiativeId': 1, "contacts.questions.category_id": 1});
+    await db.collection('clientCriteria').createIndex({"value" : 1});
 }
 
 /**
@@ -39,8 +40,7 @@ async function before(db) {
  *   8. That's possible to rewrite a few last steps to merge a few pipeline steps in one.
  */
 async function task_3_1(db) {
-    throw new Error("Not implemented"); //remove the line before starting the task
-
+   
     const result = await db.collection('opportunities').aggregate([
         {
             "$match" : {
@@ -61,36 +61,62 @@ async function task_3_1(db) {
             }
         },
         {
+            $project: {
+                "_id" : 1,
+                "contacts.id" : 1,
+                "contacts.datePublished" : 1,
+                "contacts.shortListedVendors.is_selected" : 1,
+                "contacts.shortListedVendors.name" : 1,
+                "contacts.shortListedVendors.value": 1,
+                "contacts.questions.answers.criteria_value" : 1,
+                "contacts.questions.answers.primary_answer_value" : 1,
+                "contacts.questions.answers.primary_answer_text": 1,
+                "contacts.questions.answers.loopInstances.is_selected" : 1,
+                "contacts.questions.answers.loopInstances.loop_instance" : 1,
+                "contacts.questions.answers.loopInstances.loop_text" : 1,
+                "contacts.questions.category_id" : 1,    
+                "contacts.questions.criteria_value" : 1,
+                "contacts.questions.id" : 1,
+                "contacts.questions.label" : 1,
+                "contacts.questions.raw_text" : 1,
+                "contacts.win_vendor.is_client" : 1,              
+                "contacts.win_vendor.name" : 1,              
+                "contacts.win_vendor.value" : 1,              
+            }
+        },
+        {
             "$unwind" : "$contacts"
         },
         {
             "$match" : {
-                "contacts.datePublished" : {
-                    "$ne" : null
-                }
-            }
-        },
-        {
-            "$match" : {
-                "contacts.shortListedVendors" : {
-                    "$elemMatch" : {
-                        "$or" : [
-                            {
-                                "name" : "ADP",
-                                "is_selected" : true
-                            },
-                            {
-                                "value" : {
-                                    "$in" : [
-                                        50
-                                    ],
-                                    "$lt" : 9000
-                                },
-                                "is_selected" : true
+                "$and": [ 
+                    {
+                        "contacts.datePublished" : {
+                            "$ne" : null
+                        }
+                    },
+                    {
+                        "contacts.shortListedVendors" : {
+                            "$elemMatch" : {
+                                "$or" : [
+                                    {
+                                        "name" : "ADP",
+                                        "is_selected" : true
+                                    },
+                                    {
+                                        "value" : {
+                                            "$in" : [
+                                                50
+                                            ],
+                                            "$lt" : 9000
+                                        },
+                                        "is_selected" : true
+                                    }
+                                ]
                             }
-                        ]
+                        }
                     }
-                }
+                ]
             }
         },
         {
@@ -98,43 +124,45 @@ async function task_3_1(db) {
         },
         {
             "$match" : {
-                "contacts.questions.category_id" : {
-                    "$in" : [
-                        105,
-                        147
-                    ]
-                }
-            }
-        },
-        {
-            "$match" : {
-                "$nor" : [
+                "$and": [ 
                     {
-                        "contacts.questions.category_id" : 105,
-                        "contacts.questions.answers" : {
-                            "$elemMatch" : {
-                                "primary_answer_value" : {
-                                    "$gte" : 9000
-                                },
-                                "loopInstances" : {
+                        "contacts.questions.category_id" : {
+                            "$in" : [
+                                105,
+                                147
+                            ]
+                        }
+                    },
+                    {
+                        "$nor" : [
+                            {
+                                "contacts.questions.category_id" : 105,
+                                "contacts.questions.answers" : {
                                     "$elemMatch" : {
-                                        "is_selected" : true,
-                                        "$or" : [
-                                            {
-                                                "loop_instance" : {
-                                                    "$in" : [
-                                                        50
-                                                    ]
-                                                }
-                                            },
-                                            {
-                                                "loop_text" : "ADP"
+                                        "primary_answer_value" : {
+                                            "$gte" : 9000
+                                        },
+                                        "loopInstances" : {
+                                            "$elemMatch" : {
+                                                "is_selected" : true,
+                                                "$or" : [
+                                                    {
+                                                        "loop_instance" : {
+                                                            "$in" : [
+                                                                50
+                                                            ]
+                                                        }
+                                                    },
+                                                    {
+                                                        "loop_text" : "ADP"
+                                                    }
+                                                ]
                                             }
-                                        ]
+                                        }
                                     }
                                 }
                             }
-                        }
+                        ]
                     }
                 ]
             }
@@ -243,8 +271,20 @@ async function task_3_1(db) {
         {
             "$lookup" : {
                 "from" : "clientCriteria",
-                "localField" : "criteria_value",
-                "foreignField" : "value",
+                "let" : { "criteria_value": "$criteria_value"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "versions.initiativeId" : ObjectId("58af4da0b310d92314627290")
+                        }
+                    },
+                    {
+                    "$match": {
+                        "$expr": {
+                            "$eq": ["$value", "$$criteria_value"]
+                        }
+                    }
+                  }],
                 "as" : "criteria"
             }
         },
@@ -253,11 +293,6 @@ async function task_3_1(db) {
         },
         {
             "$unwind" : "$criteria.versions"
-        },
-        {
-            "$match" : {
-                "criteria.versions.initiativeId" : ObjectId("58af4da0b310d92314627290")
-            }
         },
         {
             "$group" : {
